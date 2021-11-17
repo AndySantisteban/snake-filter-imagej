@@ -11,8 +11,9 @@ Plug-in filter based on the SNAKE technique that allows the tracing of images, i
 - Install Imagej from its official website. 👇
   https://imagej.nih.gov/ij/download.html
 
-- Si instala el codigo de imagej debe copiar los archivos .java dentro de la carpeta plugins de imagej y compilar ambos ficheros.
-- Si instala el Imagej compilado deberá compilar primero el archivo pointer y después el snake.
+- If you install the imagej code you must copy the .java files into the imagej plugins folder and compile both files.
+
+- If you install the compiled Imagej you must compile the pointer file first and then the snake.
 
 ### Authors
 
@@ -32,8 +33,14 @@ Plug-in filter based on the SNAKE technique that allows the tracing of images, i
 
 - The research document is located in the docs folder in PDF format.
 
+### Preview
+
+---
+
+![Before](./docs/before.jfif)
+
 ### Results
 
 ---
 
-![Resultado](./docs/filter1.jfif)
+![Result](./docs/filter1.jfif)
