@@ -32,7 +32,7 @@ Plug-in filter based on the SNAKE technique that allows the tracing of images, i
 
 - The research document is located in the docs folder in PDF format.
 
-### Resultados
+### Results
 
 ---
 
