@@ -31,76 +31,51 @@ public class Snake_Filter implements PlugIn {
      */
     public ImagePlus imp; 	
         
-	/** Procesador actualmente activo */
 	public ImageProcessor ip;
 	
-        /** Radio de suavizado utilizado para calcular el gradiente **/
 	float dSuavizado;
 	
-        /** Derivadas de gaussiano (primer orden en x e y) **/
 	ImageProcessor gaussianX;
 	ImageProcessor gaussianY;
         
-        /** Campo vectorial normalizado de gradiente **/
 	float [][][] campoNormalizado;
 	
-        /** Paso de tiempo de integración **/
 	float dTiempoEjecucion;
 	
-	/** Cuadrícula de espacios ocupados **/
-	List[][] Grid; // = new List<String>[2]; Inicializar la variable
+	List[][] Grid; 
 	
-	/** Tamaño de la cuadrícula **/
 	int nWG,nHG;
 
-	/** nuevas coordenadas de puntos de semilla **/
 	ArrayList<Float []> puntosBase = new ArrayList<>(); 
 	
-	/** distancia de separación entre curvas de nivel **/
 	float distanciaSeparacion;
         
-	/** Detener la integración de la línea cuando está más cerca que * (dPararLineaSeparacion * distanciaSeparacion) **/
 	float dPararLineaSeparacion;
 	
-	/** Ignorar los contornos abiertos **/
 	boolean bEliminarAbierto;
         
-        /** Tamaños de la grilla **/
 	float dGridSize;
 	
-        /** Tamaño de la imagen **/
 	int nW,nH;
 
-	/** nombre de LUT elegido **/
 	String sNombreLut;
 
-	/** Matriz de colores LUT **/	
 	int [][] RGBLutTabla;
 	
-	/** invertir LUT **/
 	boolean bInvertirLUT;
 	
-	/** si usar un solo color o LUT **/
 	boolean bColorSimple;
 	
-	/** color seleccionado de Selector de color / Barra de herramientas **/
 	Color sistemaColor;
 	
-	//double dStrokeWidth;  // Anchura del trazo
-	
-	/** superposición para renderizar **/
 	Overlay image_overlay; 
 
-	/** Intensidades mínimas y máximas de la imagen tomadas de Contraste / Brillo **/
 	float fInMin;
 	float fInRango;
 	float fInMax;
 	
-	/** semilla inicial para la primera línea,
-	 * punto con la pendiente mínima **/
 	Point iniSemilla;
 	
-	/** número total de contornos **/
 	int nLineas;
 	
 	@Override
@@ -108,7 +83,6 @@ public class Snake_Filter implements PlugIn {
 		
 		PolygonRoi new_line;
 		
-		/** variables de medición del tiempo **/
 		long startTime, contourTime=0;
 		
 		imp = IJ.getImage();
@@ -122,8 +96,6 @@ public class Snake_Filter implements PlugIn {
 		    IJ.error("8, 16 or 32-bit imagen en escala de grises requerida");
 		    return;
 		}	
-		// pedir parámetros
-
 		if(!showParametersDialog())
                     return;
 		
@@ -147,33 +119,24 @@ public class Snake_Filter implements PlugIn {
 		{
 			IJ.log("Se eliminan los contornos abiertos");
 		}
-		// Comencemos a medir el tiempo
 		startTime = System.nanoTime();
-				
 		nW=imp.getWidth();
 		nH=imp.getHeight();
 		ip=imp.getProcessor();
-
-		/** Tamaño de la cuadrícula **/
 		dGridSize=0.5f*distanciaSeparacion;
 		nWG=(int)Math.ceil(nW/(float)dGridSize);
 		nHG=(int)Math.ceil(nH/(float)dGridSize);
-
 		Grid = new ArrayList[nWG][nHG];
 
-		/** Derivadas del cálculo gaussiano **/
 		double[][] kernel = computeKernelGaussian2D_du(dSuavizado,dSuavizado, 0.0f);		
 		gaussianX= convolve(ip, kernel);
 		kernel = computeKernelGaussian2D_dv(dSuavizado,dSuavizado, 0.0f);
                 gaussianY= convolve(ip, kernel);		
 		
-		// normalizar el campo de gradiente
 		campoNormalizado  = new float [nW][nH][2];
 		fillNormalizedField();
 		image_overlay = new Overlay();
 		
-		// configurar los colores de los contornos
-
 		if (bColorSimple)
                     sistemaColor = Toolbar.getForegroundColor();
 		else
@@ -186,28 +149,21 @@ public class Snake_Filter implements PlugIn {
 		
 		nLineas=0;
                 
-		// Primera linea
 		new_line=buildLine(iniSemilla.getX(),iniSemilla.getY());
 		if(new_line!=null)
 		{
-                // Agregar a la superposición
                 image_overlay.add(new_line);		
                 nLineas++;
                 IJ.log("Linea "+ Integer.toString(nLineas)+" Añadir.");
 		}
 
-		// Abrir la ventana
 		imp.setOverlay(image_overlay);
 		imp.updateAndRepaintWindow();
 		imp.show();
 		
-		// Utilizando semillas de la primera línea de contorno
-
 		if (generateLinesFromSeedList())
 		{
-                    // Comprobar semillas de celdas vacías
                     refillSeedList();
-                    // Reintento
                     generateLinesFromSeedList();
 		}
 		
@@ -216,10 +172,8 @@ public class Snake_Filter implements PlugIn {
 		IJ.log("Tiempo Total: " + String.format("%.2f",((double)Math.abs(contourTime))*0.000000001) + " s");
 	}
 	
-	/** Generar líneas usando la cola puntosBase **/
 	boolean generateLinesFromSeedList()
 	{
-            // Pasando por la cola de puntos semilla y Generando por lineas
             PolygonRoi new_line;
             boolean goOn=true;
             boolean bFoundSeed; 
@@ -236,7 +190,6 @@ public class Snake_Filter implements PlugIn {
 
                     while (!bFoundSeed)
                     {
-                        // La cola está vacía, terminar
                         if(puntosBase.isEmpty())
                         {
                             goOn = false;
@@ -246,18 +199,15 @@ public class Snake_Filter implements PlugIn {
 
                         if(isBusy(seed_point[0],seed_point[1],0.9f*distanciaSeparacion))
                         {
-                            // Si el punto de semilla está demasiado cerca de otra línea de contorno,saca la semilla de la cola
                             puntosBase.remove(0);
                         }
                         else
                         {
-                            // El punto de semilla está bien
                             bFoundSeed=true;				
                             puntosBase.remove(0);
                         }
                     }
                     
-                    // Generar una línea de contorno desde el punto inicial
                     if(goOn && bFoundSeed)
                     {
                         new_line=buildLine(seed_point[0],seed_point[1]);
@@ -291,8 +241,6 @@ public class Snake_Filter implements PlugIn {
             * @return  **/
 	public PolygonRoi buildLine(float xstart, float ystart)
 	{
-		/** Propia cuadrícula de la línea actual para verificar si hay auto-intersecciones.
-		  Es igual al tamaño de la imagen. La precisión de más de 1 píxel parece innecesaria **/
 		int [][] ownGrid  = new int [nW][nH];
 		int gx, gy, gxn,gyn,nDirection;
                 
@@ -307,8 +255,6 @@ public class Snake_Filter implements PlugIn {
 		px.add(xstart);
 		py.add(ystart);
 		
-		// La línea crecerá en dirección hacia adelante y hacia atrás.
-		//  Esta variable lo especifica.
 		nDirection =1;
 		
 		for(nDirection=1;nDirection>-2;nDirection-=2)
@@ -317,18 +263,15 @@ public class Snake_Filter implements PlugIn {
 			xcurr=xstart;
 			ycurr=ystart;
                         
-			// Marcar el píxel OwnGrid como actual (1)
 			gx = (int) Math.floor(xstart);
 			gy = (int) Math.floor(ystart);
 			ownGrid[gx][gy]=1;
 
 			while (!bEnd)
 			{
-                            // Gradiente en la posición actual (+/- depende de nDirection)
                             xvel = ((float)nDirection)*campoNormalizado[Math.round(xcurr)][Math.round(ycurr)][0];
                             yvel = ((float)nDirection)*campoNormalizado[Math.round(xcurr)][Math.round(ycurr)][1];
 
-                            // Compruebe que no sea un sumidero o una fuente o simplemente cero píxeles
                             if(Float.isNaN((Float)xvel))
                             {
                                 bEnd=true;
@@ -343,11 +286,9 @@ public class Snake_Filter implements PlugIn {
                                 }
                                 else
                                 {
-                                    // Hacer crecer una línea por paso de integración
                                     xcurr = xcurr +xvel * dTiempoEjecucion;
                                     ycurr = ycurr +yvel * dTiempoEjecucion;
 
-                                    // La línea está cerca de otra línea, abortar el crecimiento
                                     if(isBusy(xcurr,ycurr,distanciaSeparacion*dPararLineaSeparacion))
                                     {
                                         bEnd = true;
@@ -355,26 +296,20 @@ public class Snake_Filter implements PlugIn {
                                     }
                                     else
                                     {
-                                        // Revisemos la auto-intersección
                                         gxn = (int) Math.floor(xcurr);
                                         gyn = (int) Math.floor(ycurr);
-                                        // Fuera de imagen, abortar!
                                         if(gxn<0 || gyn<0 || gxn>(nW-1)|| gyn>(nH-1))
                                         {
                                             bEnd = true;
                                         }
                                         else
                                         {
-                                            // auto-intersección, abortar!
                                             if(ownGrid[gxn][gyn]==2)
                                             {
                                                 bEnd = true;
                                             }
                                             else
                                             {
-                                                // Salimos del píxel de "crecimiento" actual
-                                                // Vamos a marcarlo con (2) = visitado
-                                                // y marcar el nuevo píxel como actual (1)
                                                 if(gxn!=gx || gyn!=gy)
                                                 {
                                                     ownGrid[gx][gy]=2;
@@ -382,15 +317,12 @@ public class Snake_Filter implements PlugIn {
                                                     gy=gyn;
                                                     ownGrid[gx][gy]=1;
                                                 }
-                                                // agregar un punto al final de la matriz de líneas (crecimiento hacia adelante)
                                                 if(nDirection==1)
                                                 {
                                                     px.add(xcurr);
                                                     py.add(ycurr);
 
                                                 }
-                                                // Agregar un punto al comienzo de la matriz de líneas (crecimiento hacia atrás)
-                                                // de esta manera los puntos en la matriz se indexan continuamente
                                                 else
                                                 {
                                                         px.add(0,xcurr);
@@ -402,10 +334,8 @@ public class Snake_Filter implements PlugIn {
                                 }
                             }   
                         }
-                // Estado aquí también
                 ownGrid[gx][gy]=2;
             }
-		//Variables de generacion linea
 		float[] floatX = new float[px.size()];
 		float[] floatY = new float[px.size()];
 		float nAverVal=0;
@@ -413,25 +343,18 @@ public class Snake_Filter implements PlugIn {
 		int nPoints =px.size();
 		for (i=0;i<nPoints;i++) 
 		{
-                    // Conviértalo en dos matrices que podrían alimentarse a PolygonRoi
                     floatX[i]=px.get(i);
                     floatY[i]=py.get(i);
                     
-                    // Agregue puntos semilla en ambos lados de cada punto en la línea
                     addSeedPoint(floatX[i],floatY[i]);
-                    // Agregue una nueva línea a la cuadrícula que rastrea el espacio ocupado
                     markOccupied(px.get(i), py.get(i));
 		}
 		
-		// ROI de la línea de contorno		
-		// Vamos a comprobar la distancia desde el principio hasta el final
-		// Si tiene menos de 1,5 píxeles, conviértalo en un contorno cerrado
-
 		 if(Math.sqrt(Math.pow(floatX[0]-floatX[nPoints-1], 2)+Math.pow(floatY[0]-floatY[nPoints-1], 2))<1.5)
 		 {
                     polyline = new PolygonRoi(floatX, floatY, Roi.POLYGON);
 		 }
-		 else //polyline
+		 else 
 		 {
                     if(bEliminarAbierto)
                     {	 return null;}
@@ -439,16 +362,13 @@ public class Snake_Filter implements PlugIn {
                     {polyline = new PolygonRoi(floatX, floatY, Roi.POLYLINE);}
 		 }
                  
-		 // Un solo color
 		 if(bColorSimple)
 		 {
                     polyline.setStrokeColor(sistemaColor);
 		 }
                  
-		 // Uso de colores LUT para codificar la profundidad del color
 		 else
 		 {
-                    // Calcular la intensidad media por línea
                     nAverVal=0;
                     
                     for (i=0;i<nPoints;i++) 
@@ -457,7 +377,6 @@ public class Snake_Filter implements PlugIn {
                     }
                     nAverVal/=px.size();	
 
-                    // Elegir la configuración actual de contraste / brillo de la imagen
                     if(nAverVal>fInMax)
                             nAverVal=255;
                     else
@@ -471,21 +390,17 @@ public class Snake_Filter implements PlugIn {
                     polyline.setStrokeColor(new Color(RGBLutTabla[(int)nAverVal][0],RGBLutTabla[(int)nAverVal][1],RGBLutTabla[(int)nAverVal][2]));
 		 }
 		 
-		//polyline.setStrokeWidth(dStrokeWidth);
 		
 		return polyline;
 		
 		
 	}
-	/** La función agrega un punto a la variable Grid
-            * que rastrean la densidad local de las curvas de nivel en la imagen **/
 	void markOccupied(float xin, float yin)
 	{
 		int gx,gy;
 		
 		ArrayList<Point> currarr;		
 		
-		//grid's cell coordinate
 		gx = (int) Math.floor(xin/dGridSize);
 		gy = (int) Math.floor(yin/dGridSize);
 		currarr =(ArrayList<Point>) Grid[gx][gy];
@@ -497,9 +412,6 @@ public class Snake_Filter implements PlugIn {
 		currarr.add(new Point(xin,yin));
 	}
 	
-	/** La función agrega dos puntos de semilla a la cola puntosBase
-            (si no están en una forma de otra línea, es decir, más lejos
-            que el valor distanciaSeparacion) **/
 	void addSeedPoint(float xs, float ys)
 	{
             float xn,yn,xvel, yvel;
@@ -509,11 +421,9 @@ public class Snake_Filter implements PlugIn {
 
             for(nDirection=1;nDirection>-2;nDirection-=2)
             {
-                // Dirección perpendicular
                 xvel = campoNormalizado[Math.round(xs)][Math.round(ys)][1]*((float)nDirection);
                 yvel = -campoNormalizado[Math.round(xs)][Math.round(ys)][0]*((float)nDirection);
 
-                // Punto especial (plano o fuente o fregadero)
                 if(Float.isNaN((Float)xvel) ||Float.isNaN((Float)yvel))
                 {
                     return;
@@ -531,23 +441,18 @@ public class Snake_Filter implements PlugIn {
             }		
 	}
 	
-	/** La función genera puntos de semilla adicionales en las celdas de Grid.
-            * donde no hay puntos (para llenar la imagen completa **/
 	void refillSeedList()
 	{
             int gx,gy;
             ArrayList<Point> currarr;		
             Float[] spoint;
 
-            //grid's cell coordinate
             for (gx=0;gx<nWG;gx++)
                 for (gy=0;gy<nHG;gy++)
                 {
                     currarr =(ArrayList<Point>) Grid[gx][gy];
-                    //Limpiar celdas
                     if(currarr==null)
                     {
-                        // Agregue un punto de semilla en el medio de la celda
                         spoint = new Float [2];
                         spoint[0]=((float)gx)*dGridSize+0.5f*dGridSize;
                         spoint[1]=((float)gy)*dGridSize+0.5f*dGridSize;
@@ -577,11 +482,9 @@ public class Snake_Filter implements PlugIn {
                     return true;
 		}
                 
-		// índice de celda de cuadrícula
 		gx = (int) Math.floor(xc/dGridSize);
 		gy = (int) Math.floor(yc/dGridSize);
 		
-		// Comprobando las celdas vecinas también
 		for (i=gx-nRange;i<=gx+nRange;i++)
                     for (j=gy-nRange;j<=gy+nRange;j++)
                     {
@@ -603,10 +506,7 @@ public class Snake_Filter implements PlugIn {
 		return false;
 		
 	}
-	/**  Calcula el campo vectorial normalizado que es ortogonal al campo de gradiente 
-            * calculado en los procesadores de imágenes gaussianX y gaussianY.
-            * Se almacena en la variable campoNormalizado.
-            * Además, almacena el punto con el gradiente de valor absoluto más pequeño en la variable iniSemilla **/
+	
 	public void fillNormalizedField()
 	{
 		int i,j,imin,jmin;
@@ -636,8 +536,6 @@ public class Snake_Filter implements PlugIn {
                             campoNormalizado[i][j][1]=Float.NaN;					
                         }
                     }
-		// caso trivial, la imagen es completamente incorrecta
-		// escojamos el punto medio de la imagen
 		if(imin==-1)
 		{
                     iniSemilla=new Point((float)nW*0.5f,(float)nH*0.5f);
@@ -697,11 +595,9 @@ public class Snake_Filter implements PlugIn {
             * @return  **/
 	public static double[][] computeKernelGaussian2D_du(double sigma_x, double sigma_y, float theta)
 	{
-            // calcular el tamaño de kernel requerido (2 * 3 * sigma ~ 99%)
             int kernel_radius = (int)Math.round(3*Math.max(sigma_x, sigma_y)); // RSLV: use floor instead of round?
             int kernel_size = 1+2*kernel_radius;
 
-            // computar kernel
             double[][] kernel = new double[kernel_size][kernel_size];
             for(int ky = 0; ky < kernel_size; ++ky)
             {
@@ -714,8 +610,6 @@ public class Snake_Filter implements PlugIn {
                     kernel[kx][ky] = gaussian2D_dx(u, v, sigma_x, sigma_y);
                 }
             }
-		
-            // normalizar el kernel
             kernel = normalize_kernel(kernel);
 
             return kernel;
@@ -727,11 +621,8 @@ public class Snake_Filter implements PlugIn {
             * @return  **/
 	public static double[][] computeKernelGaussian2D_dv(double sigma_x, double sigma_y, float theta)
 	{
-            // calcular el tamaño de kernel requerido (2 * 3 * sigma ~ 99%)
             int kernel_radius = (int)Math.round(3*Math.max(sigma_x, sigma_y)); // RSLV: ¿usar piso en lugar de redonda?
             int kernel_size = 1+2*kernel_radius;
-
-            // Computar kernel
             double[][] kernel = new double[kernel_size][kernel_size];
             for(int ky = 0; ky < kernel_size; ++ky)
             {
@@ -745,7 +636,6 @@ public class Snake_Filter implements PlugIn {
                 }
             }
 
-            // normalizar el kernel
             kernel = normalize_kernel(kernel);
 
             return kernel;
@@ -775,22 +665,18 @@ public class Snake_Filter implements PlugIn {
         * @return  **/
 	public static double[][] normalize_kernel(double[][] kernel)
 	{
-            // Calcular la suma de componentes
             double sum = 0.0;
             for(int kx = 0; kx < kernel.length; ++kx)
             {
                 for(int ky = 0; ky < kernel[kx].length; ++ky)
                 {
-                    sum += Math.abs(kernel[kx][ky]); // NOTA: use abs para normalizar el núcleo simétrico con un lóbulo positivo y negativo
+                    sum += Math.abs(kernel[kx][ky]); 
                 }
             }
-            // Evitar la división por cero
             if(sum == 0.0) { return kernel; }
 
-            // Calcular el factor de escala
             double scale_factor = 1 / sum;
 
-            // Componentes de escala
             for(int kx = 0; kx < kernel.length; ++kx)
             {
                 for(int ky = 0; ky < kernel[kx].length; ++ky)
@@ -807,22 +693,18 @@ public class Snake_Filter implements PlugIn {
         * @return  **/
 	public static ImageProcessor convolve(ImageProcessor ip, double[][] kernel)
 	{
-            // Obtener tamaños de imagen y kernel
             int image_width = ip.getWidth(),
                 image_height = ip.getHeight(), 
                 kernel_width = kernel.length,  
-                kernel_height = kernel_width, // NOTA: suponga núcleo cuadrado
+                kernel_height = kernel_width, 
                 kernel_half_width;
                 kernel_half_width = (int)Math.floor(0.5 * kernel_width);
             int kernel_half_height = kernel_half_width;
 
-            // Convertir el procesador de imagen de entrada a flotar
-            ImageProcessor ip_inp = ip.convertToFloat(); // RSLV: duplicate first?
+            ImageProcessor ip_inp = ip.convertToFloat(); 
 
-            // Crear un nuevo procesador flotante de salida vacío
             ImageProcessor ip_res = new FloatProcessor(image_width, image_height);
 
-            // Convolucionar imagen de entrada con kernel
             for(int py = 0; py < image_height; ++py)
             {
                 for(int px = 0; px < image_width; ++px)
@@ -831,13 +713,13 @@ public class Snake_Filter implements PlugIn {
                     for(int ky = 0; ky < kernel_height; ++ky)
                     {
                         int ppy = py + ky - kernel_half_height;
-                        if(ppy < 0) ppy = 0; // Abrazadera en el borde 
-                        if(ppy >= image_height) ppy = image_height - 1; // Abrazadera en el borde
+                        if(ppy < 0) ppy = 0; 
+                        if(ppy >= image_height) ppy = image_height - 1; 
                         for(int kx = 0; kx < kernel_width; ++kx)
                         {
                             int ppx = px + kx - kernel_half_width;
-                            if(ppx < 0) ppx = 0; // Abrazadera en el borde 
-                            if(ppx >= image_width) ppx = image_width - 1; // Abrazadera en el borde
+                            if(ppx < 0) ppx = 0; 
+                            if(ppx >= image_width) ppx = image_width - 1; 
                             kernel_product += ip_inp.getf(ppx, ppy) * kernel[kx][ky];
                         }
                     }
@@ -847,14 +729,6 @@ public class Snake_Filter implements PlugIn {
             return ip_res;
 	}
 	
-	/** la función obtiene la LUT especificada por sZLUTName en la configuración
-	 * y devuelve un mapa de tabla de 256x3 en formato RGB.
-	 * Esto se hace principalmente desde que el LutLoader de ImageJ genera
-	 * algunos LUT sobre la marcha (fuego, etc.) y algunos están cargados
-	 * desde el disco duro. Además, aplica automáticamente LUT a la imagen actual.
-	 * Entonces, para obtener una tabla de LUT, hago una imagen ficticia,
-	 * codifíquelo con todos los colores de LUT y léalo en color de píxeles (y cierre la imagen).
-	 * Este truco está tomado del complemento DoM */
 	void  getRGBLutTable()
 	{
 		int i, j;
